@@ -59,9 +59,24 @@ export default function DashboardPage() {
   const [budgets, setBudgets] = useState([]);
   const [savings, setSavings] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [userName, setUserName] = useState("");
 
   useEffect(() => {
     loadAll();
+    // read cached user from localStorage (set during login/register)
+    try {
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("user");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const name = [parsed.first_name, parsed.last_name].filter(Boolean).join(" ") || parsed.username || "";
+          setUserName(name);
+        }
+      }
+    } catch (e) {
+      // ignore parse errors
+    }
   }, []);
 
   async function loadAll() {
@@ -151,10 +166,19 @@ export default function DashboardPage() {
     return totalBudgeted ? (spent / totalBudgeted) * 100 : 0;
   }, [budgets]);
 
+  function doLogout() {
+    try {
+      if (typeof window !== "undefined") localStorage.clear();
+    } catch (e) {
+      console.warn("logout clear failed", e);
+    }
+    router.push("/");
+  }
+
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r p-4 flex flex-col justify-between">
+    <div className="min-h-screen bg-gray-50">
+      {/* Sidebar: fixed to left and top */}
+      <aside className="fixed left-0 top-0 w-64 h-screen bg-white border-r p-4 flex flex-col justify-between z-40">
         <div>
           <div className="text-xl font-semibold mb-6">Budget Tracker</div>
           <nav className="flex flex-col gap-2">
@@ -165,20 +189,20 @@ export default function DashboardPage() {
           </nav>
         </div>
         <div className="text-sm">
-          <button className="w-full text-left px-3 py-2 rounded hover:bg-gray-100">👤 Profile</button>
-          <button className="w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-rose-600">Logout</button>
+          <button onClick={() => router.push('/profile')} className="w-full text-left px-3 py-2 rounded hover:bg-gray-100">👤 Profile</button>
+          <button onClick={() => setShowLogoutConfirm(true)} className="w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-rose-600">Logout</button>
         </div>
       </aside>
 
-      {/* Main area */}
-      <div className="flex-1 p-6">
-        {/* Slim navbar */}
-        <div className="flex items-center justify-between bg-white rounded shadow-sm p-3 mb-6">
-          <div className="text-sm text-gray-700">Hello, {/* replace with user name when available */}User Name</div>
-          <div className="text-sm text-gray-500">Dashboard</div>
-        </div>
+      {/* Navbar: fixed to top, starting right after the sidebar */}
+      <header className="fixed top-0 left-64 right-0 h-14 bg-white shadow-sm z-30 flex items-center px-6">
+        <div className="flex-1 text-sm text-gray-700">Hello, {userName || "User"}</div>
+        <div className="text-sm text-gray-500">Dashboard</div>
+      </header>
 
-        {/* Main content */}
+
+      {/* Main content area: offset by sidebar width and navbar height; this area scrolls */}
+      <main className="ml-64 pt-14 p-6" style={{ minHeight: 'calc(100vh - 56px)' }}>
         <div className="space-y-6">
           {/* Overview cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -289,7 +313,22 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-      </div>
+
+        {/* Logout confirmation modal */}
+        {showLogoutConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-lg p-6 w-full max-w-sm">
+              <h3 className="text-lg font-semibold mb-2">Confirm logout</h3>
+              <p className="text-sm text-gray-600">Are you sure you want to logout? This will clear local session data.</p>
+              <div className="flex justify-end gap-2 mt-4">
+                <button onClick={() => setShowLogoutConfirm(false)} className="px-3 py-2 border rounded">Cancel</button>
+                <button onClick={() => { setShowLogoutConfirm(false); doLogout(); }} className="px-3 py-2 bg-rose-600 text-white rounded">Logout</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
     </div>
   );
 }
