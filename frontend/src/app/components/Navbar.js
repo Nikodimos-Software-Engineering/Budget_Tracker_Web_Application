@@ -8,15 +8,30 @@ export default function Navbar() {
   const pathname = usePathname() || "/";
   const [open, setOpen] = useState(false);
 
+  if (pathname === "/" || pathname === "/dashboard") return null;
+
   const links = [
     { href: "/dashboard", label: "Dashboard" },
+    { href: "/transactions", label: "Transaction" },
     { href: "/budget", label: "Budget" },
     { href: "/savings-goals", label: "Savings Goals" },
   ];
 
+  const findActive = () => {
+    const exact = links.find((l) => l.href === pathname);
+    if (exact) return exact;
+    const starts = links.find((l) => pathname.startsWith(l.href + "/"));
+    if (starts) return starts;
+    if (pathname === "/") return links.find((l) => l.href === "/dashboard") || links[0];
+    const parts = pathname.split("/").filter(Boolean);
+    const label = parts.length ? parts[0].replace(/-/g, " ") : "App";
+    return { href: pathname, label: label.charAt(0).toUpperCase() + label.slice(1) };
+  };
+
+  const active = findActive();
+
   const isActive = (href) => {
-    if (href === "/dashboard" && pathname === "/") return false;
-    return pathname === href;
+    return active && href === active.href;
   };
 
   return (
@@ -24,8 +39,8 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           <div className="flex items-center">
-            <Link href="/transactions" className="text-lg font-semibold text-gray-900">
-              Transaction
+            <Link href="/" className="text-lg font-semibold text-gray-900">
+              Finance Tracker
             </Link>
           </div>
 

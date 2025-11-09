@@ -1,7 +1,7 @@
 
 from django.contrib.auth import get_user_model, authenticate
 from rest_framework import serializers
-from .models import Account, Category, Budget, Transaction
+from .models import Account, Category, Budget, Transaction, SavingsGoal
 
 
 User = get_user_model()
@@ -80,13 +80,33 @@ class TransactionSerializer(serializers.ModelSerializer):
 	account_id = serializers.PrimaryKeyRelatedField(queryset=Account.objects.all(), source="account", write_only=True)
 	category = CategorySerializer(read_only=True)
 	category_id = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), source="category", write_only=True)
+	budget = serializers.SerializerMethodField(read_only=True)
+    # allow writing budget by id; queryset left generic, view will validate ownership
+	budget_id = serializers.PrimaryKeyRelatedField(queryset=Budget.objects.all(), source="budget", write_only=True, allow_null=True, required=False)
 
 	class Meta:
 		model = Transaction
-		fields = ("id", "account", "account_id", "category", "category_id", "description", "date", "amount", "created_at")
+		fields = ("id", "account", "account_id", "category", "category_id", "budget", "budget_id", "description", "date", "amount", "created_at")
 
 	def create(self, validated_data):
 		# user is set in the viewset perform_create
+		return super().create(validated_data)
+
+	def update(self, instance, validated_data):
+		return super().update(instance, validated_data)
+
+	def get_budget(self, obj):
+		if not getattr(obj, "budget", None):
+			return None
+		return {"id": obj.budget.id, "category": obj.budget.category.id if obj.budget.category else None, "allocated_amount": obj.budget.allocated_amount, "remaining_amount": obj.budget.remaining_amount}
+
+
+class SavingsGoalSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = SavingsGoal
+		fields = ("id", "name", "description", "current_amount", "target_amount", "created_at")
+
+	def create(self, validated_data):
 		return super().create(validated_data)
 
 	def update(self, instance, validated_data):

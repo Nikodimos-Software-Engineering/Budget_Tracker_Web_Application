@@ -27,6 +27,11 @@ async function fetchTransactions() {
   return res.data;
 }
 
+async function fetchBudgets() {
+  const res = await api.get("/budgets/");
+  return res.data;
+}
+
 async function createTransaction(payload) {
   return (await api.post("/transactions/", payload)).data;
 }
@@ -159,13 +164,14 @@ function TransactionList({ transactions, onDelete, onEdit }) {
   );
 }
 
-function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, initial }) {
+function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, budgets, initial }) {
   const [form, setForm] = useState({
     account: "",
     category: "",
     description: "",
     date: "",
     amount: "",
+    budget: "",
   });
   const [type, setType] = useState("expense"); // default type = expense
 
@@ -177,6 +183,7 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, in
         description: initial.description || "",
         date: initial.date || "",
         amount: initial.amount || "",
+        budget: initial.budget?.id || "",
       });
       setType(initial.category?.type || "expense");
     } else {
@@ -186,6 +193,8 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, in
   }, [initial, isOpen]);
 
   const filteredCategories = categories.filter((c) => c.type === type);
+  // budgets filtered by selected category
+  const budgetsForCategory = (budgets || []).filter((b) => String(b.category?.id) === String(form.category));
 
   if (!isOpen) return null;
 
@@ -208,6 +217,7 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, in
       description: form.description,
       date: form.date,
       amount: form.amount,
+      budget: form.budget || null,
     });
   };
 
@@ -261,7 +271,7 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, in
             </select>
           </div>
 
-          {type && (
+          {type && (<>
             <div>
               <label className="block text-sm mb-1">Category</label>
               <select
@@ -276,7 +286,18 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, in
                 ))}
               </select>
             </div>
-          )}
+            {type === "expense" && form.category && (
+              <div>
+                <label className="block text-sm mb-1">Budget (optional)</label>
+                <select name="budget" value={form.budget} onChange={handleChange} className="w-full border rounded px-2 py-1">
+                  <option value="">-- No budget --</option>
+                  {budgetsForCategory.map((b) => (
+                    <option key={b.id} value={b.id}>{b.category?.name} — {b.allocated_amount}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </>)}
 
           <div>
             <label className="block text-sm mb-1">Date</label>
@@ -322,6 +343,7 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, in
 export default function TransactionsPage() {
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [budgets, setBudgets] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [filters, setFilters] = useState({});
   const [loading, setLoading] = useState(false);
@@ -344,9 +366,10 @@ export default function TransactionsPage() {
 
   async function loadMeta() {
     try {
-      const [accs, cats] = await Promise.all([fetchAccounts(), fetchCategories()]);
+      const [accs, cats, buds] = await Promise.all([fetchAccounts(), fetchCategories(), fetchBudgets()]);
       setAccounts(accs);
       setCategories(cats);
+      setBudgets(buds || []);
     } catch (err) {
       console.error(err);
     }
@@ -408,6 +431,8 @@ export default function TransactionsPage() {
       description: payload.description,
       date: payload.date,
       amount: payload.amount,
+      // include optional budget selection
+      ...(payload.budget ? { budget_id: payload.budget } : {}),
     };
     try {
       const created = await createTransaction(body);
@@ -416,6 +441,13 @@ export default function TransactionsPage() {
         setTransactions(doFilter(next, filters));
         return next;
       });
+      // refresh budgets so remaining_amount updates in UI
+      try {
+        const newB = await fetchBudgets();
+        setBudgets(newB || []);
+      } catch (err) {
+        console.warn("Failed to refresh budgets", err);
+      }
       setIsOpen(false);
       setPage(1);
     } catch {
@@ -431,6 +463,13 @@ export default function TransactionsPage() {
         setTransactions(doFilter(next, filters));
         return next;
       });
+      // refresh budgets
+      try {
+        const newB = await fetchBudgets();
+        setBudgets(newB || []);
+      } catch (err) {
+        console.warn("Failed to refresh budgets", err);
+      }
     } catch {
       alert("Failed to delete transaction");
     }
@@ -448,6 +487,7 @@ export default function TransactionsPage() {
       description: payload.description,
       date: payload.date,
       amount: payload.amount,
+      ...(payload.budget ? { budget_id: payload.budget } : {}),
     };
     try {
       const updated = await updateTransaction(editing.id, body);
@@ -456,6 +496,13 @@ export default function TransactionsPage() {
         setTransactions(doFilter(next, filters));
         return next;
       });
+      // refresh budgets after update
+      try {
+        const newB = await fetchBudgets();
+        setBudgets(newB || []);
+      } catch (err) {
+        console.warn("Failed to refresh budgets", err);
+      }
       setEditing(null);
       setIsOpen(false);
     } catch {
@@ -523,6 +570,7 @@ export default function TransactionsPage() {
         onSave={(payload) => (editing ? handleSaveEdit(payload) : handleCreate(payload))}
         accounts={accounts}
         categories={categories}
+        budgets={budgets}
         initial={editing}
       />
     </div>
