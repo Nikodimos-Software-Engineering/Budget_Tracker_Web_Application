@@ -14,6 +14,7 @@ export default function Navbar() {
     { href: "/dashboard", label: "Dashboard" },
     { href: "/transactions", label: "Transaction" },
     { href: "/budget", label: "Budget" },
+    { href: "/accounts", label: "Accounts" },
     { href: "/savings-goals", label: "Savings Goals" },
   ];
 
